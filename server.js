@@ -1,0 +1,284 @@
+const http = require("http");
+const fs = require("fs/promises");
+const path = require("path");
+const crypto = require("crypto");
+
+const PORT = Number(process.env.PORT || 5600);
+const ADMIN_USER = process.env.ADMIN_USER || "admin";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "change-this-password";
+const DATA_DIR = path.join(__dirname, "data");
+const LOG_FILE = path.join(DATA_DIR, "visits.json");
+
+function send(res, status, body, headers = {}) {
+  res.writeHead(status, {
+    "content-type": "text/html; charset=utf-8",
+    "x-content-type-options": "nosniff",
+    ...headers
+  });
+  res.end(body);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function readBasicAuth(req) {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Basic ")) return null;
+
+  const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+  const splitAt = decoded.indexOf(":");
+  if (splitAt === -1) return null;
+
+  return {
+    user: decoded.slice(0, splitAt),
+    password: decoded.slice(splitAt + 1)
+  };
+}
+
+function secureEqual(a, b) {
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+function isAdmin(req) {
+  const auth = readBasicAuth(req);
+  return auth
+    && secureEqual(auth.user, ADMIN_USER)
+    && secureEqual(auth.password, ADMIN_PASSWORD);
+}
+
+function requireAdmin(res) {
+  send(res, 401, "관리자 비밀번호가 필요합니다.", {
+    "www-authenticate": 'Basic realm="Visit Log Admin"'
+  });
+}
+
+function getVisitorIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+
+  return req.socket.remoteAddress || "unknown";
+}
+
+async function readLogs() {
+  try {
+    const raw = await fs.readFile(LOG_FILE, "utf8");
+    const logs = JSON.parse(raw);
+    return Array.isArray(logs) ? logs : [];
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+async function writeLogs(logs) {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(LOG_FILE, JSON.stringify(logs.slice(-500), null, 2));
+}
+
+async function saveVisit(req) {
+  const logs = await readLogs();
+  logs.push({
+    time: new Date().toISOString(),
+    ip: getVisitorIp(req),
+    userAgent: req.headers["user-agent"] || "",
+    path: req.url || "/"
+  });
+  await writeLogs(logs);
+}
+
+function publicPage() {
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>방문 확인</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f5f7f4;
+      color: #1d2420;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    main {
+      width: min(520px, calc(100% - 32px));
+      border: 1px solid #d9ded8;
+      border-radius: 8px;
+      background: white;
+      padding: 28px;
+      box-shadow: 0 18px 60px rgba(30, 40, 34, 0.12);
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 0;
+      color: #607068;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>방문 확인됨</h1>
+    <p>이 사이트는 운영자 확인용으로 접속 시간, IP 주소, 브라우저 정보를 저장합니다.</p>
+  </main>
+</body>
+</html>`;
+}
+
+function adminPage(logs) {
+  const rows = logs.slice().reverse().map((log) => `
+    <tr>
+      <td>${escapeHtml(new Date(log.time).toLocaleString("ko-KR"))}</td>
+      <td>${escapeHtml(log.ip)}</td>
+      <td>${escapeHtml(log.path)}</td>
+      <td>${escapeHtml(log.userAgent)}</td>
+    </tr>
+  `).join("");
+
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>관리자 접속 기록</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f6f7f2;
+      color: #1e2320;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    main {
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0;
+    }
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+    .count {
+      color: #63716a;
+      font-weight: 700;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #d8ddd4;
+      border-radius: 8px;
+      background: white;
+      box-shadow: 0 16px 50px rgba(32, 45, 38, 0.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 840px;
+    }
+    th,
+    td {
+      padding: 13px 14px;
+      border-bottom: 1px solid #e7ebe5;
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    th {
+      background: #eef3ef;
+      font-size: 13px;
+      color: #46544e;
+    }
+    td:nth-child(4) {
+      max-width: 520px;
+      overflow-wrap: anywhere;
+    }
+    .empty {
+      padding: 24px;
+      color: #63716a;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>접속 기록</h1>
+      <div class="count">총 ${logs.length}개</div>
+    </header>
+    <div class="table-wrap">
+      ${logs.length ? `<table>
+        <thead>
+          <tr>
+            <th>시간</th>
+            <th>IP</th>
+            <th>경로</th>
+            <th>브라우저</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>` : `<div class="empty">아직 접속 기록이 없습니다.</div>`}
+    </div>
+  </main>
+</body>
+</html>`;
+}
+
+async function handle(req, res) {
+  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+
+  try {
+    if (url.pathname === "/admin") {
+      if (!isAdmin(req)) {
+        requireAdmin(res);
+        return;
+      }
+
+      send(res, 200, adminPage(await readLogs()));
+      return;
+    }
+
+    if (url.pathname === "/") {
+      await saveVisit(req);
+      send(res, 200, publicPage());
+      return;
+    }
+
+    send(res, 404, "페이지를 찾을 수 없습니다.");
+  } catch (error) {
+    console.error(error);
+    send(res, 500, "서버 오류가 발생했습니다.");
+  }
+}
+
+http.createServer(handle).listen(PORT, () => {
+  console.log(`Server running at http://127.0.0.1:${PORT}`);
+  console.log(`Admin page: http://127.0.0.1:${PORT}/admin`);
+  console.log(`Admin user: ${ADMIN_USER}`);
+  if (ADMIN_PASSWORD === "change-this-password") {
+    console.log("Set ADMIN_PASSWORD before publishing this site.");
+  }
+});
