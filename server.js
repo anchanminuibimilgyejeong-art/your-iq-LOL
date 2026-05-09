@@ -244,44 +244,14 @@ function serveStatic(req, res) {
 }
 
 function renderResult(record) {
-  const address = [record.geo.city, record.geo.region, record.geo.country].filter(Boolean).join(", ") || "주소 정보 없음";
-  const providerRows = (record.geo.providers || [])
-    .map((provider) => {
-      const providerAddress = [provider.city, provider.region, provider.country].filter(Boolean).join(", ") || "-";
-      return `<tr><td>${htmlEscape(provider.source)}</td><td>${htmlEscape(providerAddress)}</td><td>${htmlEscape(provider.postal || "-")}</td><td>${htmlEscape(provider.latitude || "-")}, ${htmlEscape(provider.longitude || "-")}</td></tr>`;
-    })
-    .join("");
   return `<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>IP 확인 결과</title>
-  <link rel="stylesheet" href="/styles.css">
+  <title></title>
 </head>
 <body>
-  <main class="shell">
-    <section class="panel result">
-      <p class="eyebrow">동의 완료</p>
-      <h1>확인된 IP</h1>
-      <div class="ip">${htmlEscape(record.ip)}</div>
-      <dl>
-        <div><dt>추정 위치</dt><dd>${htmlEscape(address)}</dd></div>
-        <div><dt>우편번호</dt><dd>${htmlEscape(record.geo.postal || "-")}</dd></div>
-        <div><dt>좌표</dt><dd>${htmlEscape(record.geo.latitude || "-")}, ${htmlEscape(record.geo.longitude || "-")}</dd></div>
-        <div><dt>통신사/기관</dt><dd>${htmlEscape(record.geo.org || "-")}</dd></div>
-        <div><dt>신뢰도</dt><dd>${htmlEscape(record.geo.confidence || "-")}</dd></div>
-      </dl>
-      <p class="note">${htmlEscape(record.geo.note)}</p>
-      ${providerRows ? `<div class="providerBox">
-        <h2>조회한 위치 후보</h2>
-        <table>
-          <thead><tr><th>출처</th><th>위치</th><th>우편번호</th><th>좌표</th></tr></thead>
-          <tbody>${providerRows}</tbody>
-        </table>
-      </div>` : ""}
-    </section>
-  </main>
 </body>
 </html>`;
 }
@@ -308,6 +278,28 @@ function renderAdminLogin(error = "") {
         ${error ? `<p class="errorText">${htmlEscape(error)}</p>` : ""}
         <button class="button" type="submit">들어가기</button>
       </form>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+function renderHome() {
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IP 확인</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <p class="eyebrow">IP 기반 위치 확인</p>
+      <h1>IP 확인 페이지</h1>
+      <p class="copy">동의 페이지에서 수집 내용을 확인한 뒤 진행할 수 있습니다.</p>
+      <a class="button" href="/consent">동의 페이지로 이동</a>
     </section>
   </main>
 </body>
@@ -434,13 +426,12 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === "GET" && url.pathname === "/") {
-    send(res, 200, renderConsent());
+    send(res, 200, renderHome());
     return;
   }
 
   if (req.method === "GET" && url.pathname === "/consent") {
-    res.writeHead(303, { Location: "/" });
-    res.end();
+    send(res, 200, renderConsent());
     return;
   }
 
