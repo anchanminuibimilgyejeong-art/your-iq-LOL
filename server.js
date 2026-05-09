@@ -1,7 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { renderAdmin, renderAdminLogin, renderHome, renderResult } = require("./views/pages");
+const { renderAdmin, renderAdminLogin, renderResult } = require("./views/pages");
 const { createAdminAuth } = require("./lib/admin-auth");
 const { createVisitStore } = require("./lib/visit-store");
 const { createConsentRoutes } = require("./routes/consent");
@@ -111,7 +111,8 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === "GET" && url.pathname === "/") {
-    send(res, 200, renderHome());
+    res.writeHead(303, { Location: "/consent" });
+    res.end();
     return;
   }
 
