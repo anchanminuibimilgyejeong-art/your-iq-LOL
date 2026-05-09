@@ -10,7 +10,7 @@ function renderConsent() {
   <form method="post" action="/collect">
     <label>
       <input type="checkbox" required>
-      IP 기반 위치 정보 수집에 동의합니다.
+      IP, IP 기반 대략 위치, 접속 요청 정보 수집에 동의합니다.
     </label>
     <button type="submit">확인</button>
   </form>

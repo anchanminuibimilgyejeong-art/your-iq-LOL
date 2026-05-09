@@ -219,6 +219,94 @@ th {
   overflow-wrap: anywhere;
 }
 
+body:has(.plainAdmin) {
+  background: #dcdcdc;
+  color: #111;
+}
+
+.plainAdmin {
+  padding: 12px;
+  font-family: "Malgun Gothic", Arial, sans-serif;
+}
+
+.plainAdmin header {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.plainAdmin h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.plainAdmin .adminActions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.plainAdmin .button {
+  min-height: 0;
+  padding: 5px 10px;
+  border: 1px solid #777;
+  border-radius: 0;
+  background: #efefef;
+  color: #111;
+  font-size: 13px;
+  font-weight: 400;
+  box-shadow: inset 0 1px 0 #fff;
+}
+
+.plainAdmin .button.danger {
+  background: #e5e5e5;
+  color: #900;
+}
+
+.plainAdmin .button.secondary {
+  background: #efefef;
+  color: #111;
+}
+
+.plainAdmin .tableWrap {
+  border: 1px solid #777;
+  border-radius: 0;
+  background: #fff;
+}
+
+.plainAdmin table {
+  min-width: 1180px;
+  font-family: Arial, "Malgun Gothic", sans-serif;
+}
+
+.plainAdmin th,
+.plainAdmin td {
+  padding: 6px 8px;
+  border: 1px solid #aaa;
+  font-size: 12px;
+}
+
+.plainAdmin th {
+  background: #c9c9c9;
+  color: #111;
+  font-weight: 700;
+}
+
+.plainAdmin .mutedNumber {
+  color: #444;
+  font-size: 12px;
+}
+
+.plainAdmin .detailCell {
+  min-width: 360px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.plainAdmin .detailCell div {
+  margin: 0 0 2px;
+}
+
 @media (max-width: 560px) {
   .panel {
     padding: 24px;

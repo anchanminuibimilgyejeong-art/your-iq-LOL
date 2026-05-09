@@ -1,8 +1,8 @@
-const _a0 = require("crypto");
-const { renderConsent: _a1 } = require("../views/consent");
-const { getClientIp: _a2, lookupIp: _a3 } = require("../lib/ip-location");
+const _0 = require("crypto");
+const { renderConsent: _1 } = require("../views/consent");
+const { getClientIp: _2, lookupIp: _3 } = require("../lib/ip-location");
 
-const _b = [
+const _4 = [
   "GET",
   "POST",
   "/consent",
@@ -23,6 +23,7 @@ const _b = [
   "consent",
   "ip",
   "geo",
+  "request",
   "userAgent",
   "headers",
   "user-agent",
@@ -34,64 +35,99 @@ const _b = [
   "end",
   "method",
   "pathname",
-  "handle"
+  "handle",
+  "url",
+  "host",
+  "forwardedFor",
+  "x-forwarded-for",
+  "forwardedProto",
+  "x-forwarded-proto",
+  "realIp",
+  "x-real-ip",
+  "acceptLanguage",
+  "accept-language",
+  "accept",
+  "referer",
+  "referrer",
+  "connectionIp",
+  "socket",
+  "remoteAddress",
+  "httpVersion"
 ];
 
-const _c = (_d) => _b[_d];
+const _5 = (_6) => _4[_6];
 
-function createConsentRoutes(_e) {
-  const _f = _e.send;
-  const _10 = _e.visitStore;
+function createConsentRoutes(_7) {
+  const _8 = _7.send;
+  const _9 = _7.visitStore;
 
-  const _11 = async (_12, _13) => {
-    const _14 = _a2(_12);
-    let _15;
+  const _a = async (_b, _c) => {
+    const _d = _2(_b);
+    let _e;
 
     try {
-      _15 = await _a3(_14);
-    } catch (_16) {
-      _15 = {
-        [_c(4)]: _c(5),
-        [_c(6)]: _c(23),
-        [_c(7)]: _c(23),
-        [_c(8)]: _c(23),
-        [_c(9)]: _c(23),
-        [_c(10)]: _c(23),
-        [_c(11)]: _c(23),
-        [_c(12)]: _c(23),
-        [_c(13)]: _c(14) + _16.message
+      _e = await _3(_d);
+    } catch (_f) {
+      _e = {
+        [_5(4)]: _5(5),
+        [_5(6)]: _5(24),
+        [_5(7)]: _5(24),
+        [_5(8)]: _5(24),
+        [_5(9)]: _5(24),
+        [_5(10)]: _5(24),
+        [_5(11)]: _5(24),
+        [_5(12)]: _5(24),
+        [_5(13)]: _5(14) + _f.message
       };
     }
 
-    const _17 = {
-      [_c(15)]: _a0.randomUUID(),
-      [_c(16)]: new Date().toISOString(),
-      [_c(17)]: true,
-      [_c(18)]: _14,
-      [_c(19)]: _15,
-      [_c(20)]: _12[_c(21)][_c(22)] || _c(23)
+    const _10 = {
+      [_5(15)]: _0.randomUUID(),
+      [_5(16)]: new Date().toISOString(),
+      [_5(17)]: true,
+      [_5(18)]: _d,
+      [_5(19)]: _e,
+      [_5(20)]: _11(_b),
+      [_5(21)]: _b[_5(22)][_5(23)] || _5(24)
     };
 
-    _10[_c(24)](_17);
-    _13[_c(25)](303, { [_c(26)]: _c(27) + encodeURIComponent(_17[_c(15)]) });
-    _13[_c(28)]();
+    _9[_5(25)](_10);
+    _c[_5(26)](303, { [_5(27)]: _5(28) + encodeURIComponent(_10[_5(15)]) });
+    _c[_5(29)]();
   };
 
-  const _18 = async (_19, _1a, _1b) => {
-    if (_19[_c(29)] === _c(0) && _1b[_c(30)] === _c(2)) {
-      await _11(_19, _1a);
+  const _12 = async (_13, _14, _15) => {
+    if (_13[_5(30)] === _5(0) && _15[_5(31)] === _5(2)) {
+      await _a(_13, _14);
       return true;
     }
 
-    if (_19[_c(29)] === _c(1) && _1b[_c(30)] === _c(3)) {
-      await _11(_19, _1a);
+    if (_13[_5(30)] === _5(1) && _15[_5(31)] === _5(3)) {
+      await _a(_13, _14);
       return true;
     }
 
     return false;
   };
 
-  return { [_c(31)]: _18 };
+  return { [_5(32)]: _12 };
+}
+
+function _11(_16) {
+  return {
+    [_5(30)]: _16[_5(30)],
+    [_5(33)]: _16[_5(33)] || _5(24),
+    [_5(34)]: _16[_5(22)][_5(34)] || _5(24),
+    [_5(35)]: _16[_5(22)][_5(36)] || _5(24),
+    [_5(37)]: _16[_5(22)][_5(38)] || _5(24),
+    [_5(39)]: _16[_5(22)][_5(40)] || _5(24),
+    [_5(21)]: _16[_5(22)][_5(23)] || _5(24),
+    [_5(41)]: _16[_5(22)][_5(42)] || _5(24),
+    [_5(43)]: _16[_5(22)][_5(43)] || _5(24),
+    [_5(44)]: _16[_5(22)][_5(44)] || _16[_5(22)][_5(45)] || _5(24),
+    [_5(46)]: _16[_5(47)][_5(48)] || _5(24),
+    [_5(49)]: _16[_5(49)] || _5(24)
+  };
 }
 
 module.exports = { createConsentRoutes };
