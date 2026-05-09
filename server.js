@@ -8,6 +8,8 @@ const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
 const DATA_DIR = path.join(ROOT, "data");
 const VISITS_FILE = path.join(DATA_DIR, "visits.json");
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin1234";
+const ADMIN_COOKIE = "admin_session";
 
 function ensureDataFile() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -34,6 +36,40 @@ function htmlEscape(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function parseCookies(req) {
+  const header = req.headers.cookie || "";
+  return Object.fromEntries(
+    header
+      .split(";")
+      .map((part) => part.trim().split("="))
+      .filter(([key, value]) => key && value)
+      .map(([key, value]) => [key, decodeURIComponent(value)])
+  );
+}
+
+function adminToken() {
+  return crypto.createHash("sha256").update(`admin:${ADMIN_PASSWORD}`).digest("hex");
+}
+
+function isAdmin(req) {
+  return parseCookies(req)[ADMIN_COOKIE] === adminToken();
+}
+
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 20_000) {
+        req.destroy();
+        reject(new Error("body too large"));
+      }
+    });
+    req.on("end", () => resolve(new URLSearchParams(body)));
+    req.on("error", reject);
+  });
 }
 
 function getClientIp(req) {
@@ -188,7 +224,7 @@ function send(res, status, body, contentType = "text/html; charset=utf-8") {
 
 function serveStatic(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const fileName = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
+  const fileName = url.pathname === "/" ? "index.html" : url.pathname === "/consent" ? "consent.html" : url.pathname.slice(1);
   const filePath = path.normalize(path.join(PUBLIC_DIR, fileName));
 
   if (!filePath.startsWith(PUBLIC_DIR)) {
@@ -243,7 +279,34 @@ function renderResult(record) {
           <tbody>${providerRows}</tbody>
         </table>
       </div>` : ""}
-      <a class="button secondary" href="/admin">관리자 기록 보기</a>
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+function renderAdminLogin(error = "") {
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>관리자 로그인</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="panel">
+      <p class="eyebrow">관리자</p>
+      <h1>비밀번호 입력</h1>
+      <form method="post" action="/admin-login">
+        <label class="field">
+          <span>관리자 비밀번호</span>
+          <input name="password" type="password" autocomplete="current-password" required autofocus>
+        </label>
+        ${error ? `<p class="errorText">${htmlEscape(error)}</p>` : ""}
+        <button class="button" type="submit">들어가기</button>
+      </form>
     </section>
   </main>
 </body>
@@ -283,7 +346,7 @@ function renderAdmin() {
         <p class="eyebrow">관리자</p>
         <h1>동의한 접속 기록</h1>
       </div>
-      <a class="button secondary" href="/">처음으로</a>
+      <a class="button secondary" href="/admin-logout">로그아웃</a>
     </header>
     <div class="tableWrap">
       <table>
@@ -334,11 +397,41 @@ async function handleCollect(req, res) {
   res.end();
 }
 
+async function handleAdminLogin(req, res) {
+  const body = await parseBody(req);
+  const password = body.get("password") || "";
+
+  if (password !== ADMIN_PASSWORD) {
+    send(res, 401, renderAdminLogin("비밀번호가 틀렸습니다."));
+    return;
+  }
+
+  res.writeHead(303, {
+    Location: "/admin",
+    "Set-Cookie": `${ADMIN_COOKIE}=${encodeURIComponent(adminToken())}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`
+  });
+  res.end();
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === "POST" && url.pathname === "/collect") {
     await handleCollect(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/admin-login") {
+    await handleAdminLogin(req, res);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/admin-logout") {
+    res.writeHead(303, {
+      Location: "/admin",
+      "Set-Cookie": `${ADMIN_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+    });
+    res.end();
     return;
   }
 
@@ -353,6 +446,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === "GET" && url.pathname === "/admin") {
+    if (!isAdmin(req)) {
+      send(res, 200, renderAdminLogin());
+      return;
+    }
     send(res, 200, renderAdmin());
     return;
   }
